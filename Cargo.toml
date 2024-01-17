@@ -1,0 +1,21 @@
+[package]
+name = "wabasen"
+version = "0.1.1"
+edition = "2021"
+authors = ["Sinodevi <https://sinodevi.com>"]
+license-file = "LICENSE"
+readme = "README.md"
+repository = "https://github.com/Sinodevi/Wabasen/"
+homepage = "https://wabasen.com/"
+documentation = "https://wabasen.com/intro"
+description = "Open source software for file encryption with wallet-based 2FA."
+
+[dependencies]
+hex = "0.4.3"
+tar = "0.4.40"
+clap = "4.5.1"
+flate2 = "1.0.28"
+indicatif = "0.17.8"
+tiny-keccak = { version = "2.0.2", features = ["keccak"] }
+secp256k1 = { version = "0.28.2", features = ["recovery"] }
+chacha20poly1305 = { version = "0.10.1", features = ["stream"] }

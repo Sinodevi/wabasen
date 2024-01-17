@@ -1,0 +1,110 @@
+name: Build and Deploy release binaries
+
+on:
+  push:
+    tags:
+      - "v*"
+jobs:
+  build:
+    name: Publish for ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        name: [linux, armv7, arm64, windows, macos]
+        include:
+          - name: linux
+            os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            build_deps: >
+              libfuse-dev
+            cargo_config: |
+              [target.x86_64-unknown-linux-gnu]
+              linker = "x86_64-linux-gnu-gcc"
+            build_flags: --target x86_64-unknown-linux-gnu
+            archive_name: wabasen.tar.gz
+            asset_suffix: x86_64-linux.tar.gz
+
+          - name: armv7
+            os: ubuntu-20.04
+            target: armv7-unknown-linux-gnueabihf
+            build_deps: >
+              gcc-arm-linux-gnueabihf
+            cargo_config: |
+              [target.armv7-unknown-linux-gnueabihf]
+              linker = "arm-linux-gnueabihf-gcc"
+            build_flags: --target armv7-unknown-linux-gnueabihf
+            archive_name: wabasen.tar.gz
+            asset_suffix: armv7-linux.tar.gz
+
+          - name: arm64
+            os: ubuntu-20.04
+            target: aarch64-unknown-linux-gnu
+            build_deps: >
+              gcc-aarch64-linux-gnu
+            cargo_config: |
+              [target.aarch64-unknown-linux-gnu]
+              linker = "aarch64-linux-gnu-gcc"
+            build_flags: --target aarch64-unknown-linux-gnu
+            archive_name: wabasen.tar.gz
+            asset_suffix: arm64-linux.tar.gz
+
+          - name: windows
+            os: windows-latest
+            target: x86_64-pc-windows-gnu
+            build_flags: --target x86_64-pc-windows-gnu
+            archive_name: wabasen.zip
+            asset_suffix: x86_64-windows.zip
+
+          - name: macos
+            os: macos-latest
+            target: x86_64-apple-darwin
+            build_flags: --target x86_64-apple-darwin
+            archive_name: wabasen.tar.gz
+            asset_suffix: x86_64-darwin.tar.gz
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        id: toolchain
+        with:
+          targets: ${{ matrix.target }}
+      - run: rustup override set ${{steps.toolchain.outputs.name}}
+
+      - name: Install linux build dependencies
+        run: sudo apt update && sudo apt install ${{ matrix.build_deps }}
+        if: matrix.build_deps != ''
+
+      - name: Set up .cargo/config
+        run: |
+          mkdir .cargo
+          echo '${{ matrix.cargo_config }}' >.cargo/config
+        if: matrix.cargo_config != ''
+
+      - name: cargo build
+        run: cargo build --release ${{ matrix.build_flags }}
+
+      - name: Create archive
+        run: |
+          mkdir -p release/wabasen
+          mv target/${{ matrix.target }}/release/wabasen* release/wabasen/
+          rm release/wabasen/*.d
+          tar czf ${{ matrix.archive_name }} -C release/ wabasen/
+        if: matrix.name != 'windows'
+
+      - name: Create archive [Windows]
+        run: |
+          mkdir -p release/wabasen
+          mv target/${{ matrix.target }}/release/wabasen.exe release/wabasen/
+          cd release/
+          7z.exe a ../${{ matrix.archive_name }} wabasen/
+        shell: bash
+        if: matrix.name == 'windows'
+
+      - name: Upload archive to release
+        uses: svenstaro/upload-release-action@2.7.0
+        with:
+          repo_token: ${{ github.token }}
+          file: ${{ matrix.archive_name }}
+          asset_name: wabasen-$tag-${{ matrix.asset_suffix }}
+          tag: ${{ github.ref }}
+          prerelease: false
